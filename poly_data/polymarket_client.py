@@ -45,6 +45,11 @@ class PolymarketClient:
         except Exception as e:
             raise ValueError(f"Invalid BROWSER_ADDRESS format: {self.browser_address}. Error: {e}")
 
+        # FASE 2: Inicializar cache antes de usar
+        self._creds_cache = None  # Cache de credenciais
+        self._order_book_cache = {}  # Cache de order books
+        self._order_book_cache_ttl = 0.5  # TTL de 500ms para order book cache
+        
         try:
             self.client = ClobClient(
                 host=self.host,
@@ -56,9 +61,12 @@ class PolymarketClient:
         except Exception as e:
             raise RuntimeError(f"Failed to initialize ClobClient. Check your PK and network connection. Error: {e}")
 
+        # FASE 2: Cache de autenticação - criar e cachear credenciais
         # Create or derive API credentials with error handling
         try:
+            # FASE 2: Sempre criar novas credenciais na inicialização, mas cachear para referência
             self.creds = self.client.create_or_derive_api_creds()
+            self._creds_cache = self.creds  # Cachear credenciais
             print(f"✓ API credentials created successfully (API Key: {self.creds.api_key[:8]}...)")
         except Exception as e:
             raise RuntimeError(f"Failed to create API credentials. Your private key may be invalid. Error: {e}")
@@ -176,9 +184,39 @@ class PolymarketClient:
                 print(f"❌ Failed to post order for {action} {marketId} at {price}: {ex}")
             return {}
 
-    def get_order_book(self, market):
+    def get_order_book(self, market, use_cache=True):
+        """
+        Get order book for a market with optional caching.
+        
+        Args:
+            market: Market token ID
+            use_cache: Whether to use cached results (Fase 2 optimization)
+        
+        Returns:
+            tuple: (bids_df, asks_df)
+        """
+        # FASE 2: Cache de order book para reduzir requisições
+        if use_cache:
+            import time
+            current_time = time.time()
+            
+            # Verificar se temos cache válido
+            if market in self._order_book_cache:
+                cached_data, cache_time = self._order_book_cache[market]
+                if current_time - cache_time < self._order_book_cache_ttl:
+                    # Retornar cache se ainda válido
+                    return cached_data
+        
+        # Buscar order book
         orderBook = self.client.get_order_book(market)
-        return pd.DataFrame(orderBook.bids).astype(float), pd.DataFrame(orderBook.asks).astype(float)
+        result = (pd.DataFrame(orderBook.bids).astype(float), pd.DataFrame(orderBook.asks).astype(float))
+        
+        # FASE 2: Atualizar cache
+        if use_cache:
+            import time
+            self._order_book_cache[market] = (result, time.time())
+        
+        return result
 
     def get_usdc_balance(self):
         return self.usdc_contract.functions.balanceOf(self.browser_wallet).call() / 10 ** 6
@@ -194,7 +232,14 @@ class PolymarketClient:
     def get_all_positions(self):
         # FASE 1: Usar sessão reutilizável em vez de requests.get
         res = self.session.get(f'https://data-api.polymarket.com/positions?user={self.browser_wallet}')
-        return pd.DataFrame(res.json())
+        # FASE 2: Otimizar parsing JSON
+        if _USE_ORJSON:
+            data = orjson.loads(res.content)
+        elif _USE_UJSON:
+            data = ujson.loads(res.text)
+        else:
+            data = res.json()
+        return pd.DataFrame(data)
 
     def get_raw_position(self, tokenId):
         return int(self.conditional_tokens.functions.balanceOf(self.browser_wallet, int(tokenId)).call())

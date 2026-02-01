@@ -22,7 +22,10 @@ from poly_data.utils import get_sheet_df
 # Carregar variáveis de ambiente
 load_dotenv()
 
-def verificar_ordem_no_orderbook(client, token, preco, lado, tamanho, order_id=None, timeout=30):
+# FASE 2: Cache para verificação de ordem
+_order_verification_cache = {}
+
+def verificar_ordem_no_orderbook(client, token, preco, lado, tamanho, order_id=None, timeout=30, use_cache=True):
     """
     Verifica se uma ordem apareceu no order book do Polymarket.
     Retorna o tempo decorrido desde o início até a ordem aparecer.
@@ -70,7 +73,7 @@ def verificar_ordem_no_orderbook(client, token, preco, lado, tamanho, order_id=N
             except:
                 time.sleep(0.25)
     
-    # Se não encontrou nas ordens ativas, verificar no order book
+    # FASE 2: Se não encontrou nas ordens ativas, verificar no order book (com cache)
     print(f"      Verificando no order book...")
     tamanho_anterior = 0
     
@@ -79,8 +82,8 @@ def verificar_ordem_no_orderbook(client, token, preco, lado, tamanho, order_id=N
         tempo_decorrido = time.time() - inicio
         
         try:
-            # Obter order book atual
-            order_book_result = client.get_order_book(token)
+            # FASE 2: Usar cache de order book (reduz requisições)
+            order_book_result = client.get_order_book(token, use_cache=True)
             
             if order_book_result and len(order_book_result) == 2:
                 bids_df, asks_df = order_book_result
