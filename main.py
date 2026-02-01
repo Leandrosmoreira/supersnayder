@@ -4,6 +4,21 @@ import asyncio  # Asynchronous I/O
 import traceback  # Exception handling
 import logging  # Logging for debugging
 import pandas as pd  # For reading Google Sheets
+import platform  # Platform detection
+
+# FASE 7: uvloop (Linux) - event loop mais rápido
+if platform.system() == 'Linux':
+    try:
+        import uvloop
+        asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
+        logger = logging.getLogger(__name__)
+        logger.info("✓ uvloop enabled (Linux) - FASE 7")
+    except ImportError:
+        logger = logging.getLogger(__name__)
+        logger.warning("uvloop not available, using default event loop")
+else:
+    logger = logging.getLogger(__name__)
+    logger.info("uvloop only available on Linux, using default event loop")
 from poly_data.polymarket_client import PolymarketClient
 from poly_data.data_utils import update_markets, update_positions, update_orders
 from poly_data.websocket_handlers import connect_market_websocket, connect_user_websocket

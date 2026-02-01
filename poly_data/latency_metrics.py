@@ -1,5 +1,6 @@
 """
 FASE 0: Sistema de métricas de latência
+FASE 7: Otimizado com menos locks (lock-free quando possível)
 Mede t_decision, t_send, t_ack para análise de performance
 """
 import time
@@ -9,42 +10,61 @@ from typing import Dict, List, Optional
 import json
 
 class LatencyMetrics:
-    """Coleta métricas de latência com percentis."""
+    """Coleta métricas de latência com percentis.
+    
+    FASE 7: Otimizado com lock mais granular (menos contenção).
+    """
     
     def __init__(self, buffer_size=1000):
         self.buffer_size = buffer_size
         self.t_decision: Dict[str, deque] = {}  # market -> deque de nanosegundos
         self.t_send: Dict[str, deque] = {}
         self.t_ack: Dict[str, deque] = {}
+        # FASE 7: Lock mais granular (um por métrica seria ideal, mas deque já é thread-safe para append)
+        # Para simplicidade, mantemos um lock, mas reduzimos tempo de lock
         self._lock = threading.Lock()
         self.enabled = True
     
     def record_decision(self, market: str, duration_ns: int):
-        """Registra t_decision para um mercado."""
+        """Registra t_decision para um mercado.
+        
+        FASE 7: Lock apenas para criar deque (se necessário), append é thread-safe.
+        """
         if not self.enabled:
             return
-        with self._lock:
-            if market not in self.t_decision:
-                self.t_decision[market] = deque(maxlen=self.buffer_size)
-            self.t_decision[market].append(duration_ns)
+        # FASE 7: Lock apenas para verificar/criar deque, não para append
+        if market not in self.t_decision:
+            with self._lock:
+                if market not in self.t_decision:  # Double-check
+                    self.t_decision[market] = deque(maxlen=self.buffer_size)
+        # deque.append() é thread-safe (atomic)
+        self.t_decision[market].append(duration_ns)
     
     def record_send(self, market: str, duration_ns: int):
-        """Registra t_send para um mercado."""
+        """Registra t_send para um mercado.
+        
+        FASE 7: Lock apenas para criar deque (se necessário), append é thread-safe.
+        """
         if not self.enabled:
             return
-        with self._lock:
-            if market not in self.t_send:
-                self.t_send[market] = deque(maxlen=self.buffer_size)
-            self.t_send[market].append(duration_ns)
+        if market not in self.t_send:
+            with self._lock:
+                if market not in self.t_send:  # Double-check
+                    self.t_send[market] = deque(maxlen=self.buffer_size)
+        self.t_send[market].append(duration_ns)
     
     def record_ack(self, market: str, duration_ns: int):
-        """Registra t_ack para um mercado."""
+        """Registra t_ack para um mercado.
+        
+        FASE 7: Lock apenas para criar deque (se necessário), append é thread-safe.
+        """
         if not self.enabled:
             return
-        with self._lock:
-            if market not in self.t_ack:
-                self.t_ack[market] = deque(maxlen=self.buffer_size)
-            self.t_ack[market].append(duration_ns)
+        if market not in self.t_ack:
+            with self._lock:
+                if market not in self.t_ack:  # Double-check
+                    self.t_ack[market] = deque(maxlen=self.buffer_size)
+        self.t_ack[market].append(duration_ns)
     
     def get_percentiles(self, values: deque, percentiles=[50, 90, 99]):
         """Calcula percentis de uma série de valores (ns -> ms)."""

@@ -1,5 +1,6 @@
 """
 FASE 5: BookState - Estado local do order book (atualizado via WebSocket)
+FASE 7: Otimizado com single-writer e snapshots imutáveis (menos locks)
 Zero HTTP no hot path - apenas WebSocket para updates em tempo real
 """
 import time
@@ -8,6 +9,7 @@ from typing import List, Tuple, Optional, Dict
 from collections import OrderedDict
 from sortedcontainers import SortedDict
 import logging
+import asyncio
 
 logger = logging.getLogger(__name__)
 
@@ -62,8 +64,11 @@ class BookState:
         self.initialized = False
     
     def initialize_from_snapshot(self, bids: List[Tuple[float, float]], asks: List[Tuple[float, float]]):
-        """Inicializa o book a partir de um snapshot (HTTP - apenas 1x na inicialização)."""
-        with self._lock:
+        """Inicializa o book a partir de um snapshot (HTTP - apenas 1x na inicialização).
+        
+        FASE 7: Single-writer (com lock apenas para escrita).
+        """
+        with self._write_lock:  # FASE 7: Lock apenas para escrita
             self.bids.clear()
             self.asks.clear()
             
@@ -81,7 +86,7 @@ class BookState:
             self.last_snapshot_ns = self.last_update_ns
             self.initialized = True
             
-            # Criar snapshot imutável
+            # Criar snapshot imutável (sem lock adicional)
             self._update_snapshot()
             
             logger.info(f"✅ BookState inicializado para {self.market[:20]}... ({len(self.bids)} bids, {len(self.asks)} asks)")
@@ -89,10 +94,12 @@ class BookState:
     async def apply_delta(self, delta: dict):
         """Aplica delta do WebSocket ao book (FASE 5: hot path - sem HTTP).
         
+        FASE 7: Single-writer (lock apenas para escrita, snapshot imutável para leitura).
+        
         Args:
             delta: Dicionário com 'bids' e/ou 'asks' contendo updates
         """
-        with self._lock:
+        with self._write_lock:  # FASE 7: Lock apenas para escrita
             # Processar bids
             if 'bids' in delta:
                 for entry in delta['bids']:
@@ -123,27 +130,33 @@ class BookState:
             
             self.last_update_ns = time.monotonic_ns()
             
-            # Atualizar snapshot imutável
+            # Atualizar snapshot imutável (dentro do lock, mas snapshot é imutável)
             self._update_snapshot()
     
     def _update_snapshot(self):
-        """Atualiza snapshot imutável (chamado dentro do lock)."""
+        """Atualiza snapshot imutável (chamado dentro do write lock).
+        
+        FASE 7: Snapshot é imutável, então leitura não precisa de lock.
+        """
         # Converter para lista de tuplas
         bids_list = [(price, size) for price, size in self.bids.items()]
         asks_list = [(price, size) for price, size in self.asks.items()]
         
-        # Criar snapshot imutável
-        with self._snapshot_lock:
-            self._current_snapshot = ImmutableBookSnapshot(
-                bids_list,
-                asks_list,
-                self.last_update_ns
-            )
+        # FASE 7: Criar snapshot imutável (sem lock adicional - já estamos no write lock)
+        # Snapshot é imutável, então leitores podem ler sem lock
+        self._current_snapshot = ImmutableBookSnapshot(
+            bids_list,
+            asks_list,
+            self.last_update_ns
+        )
     
     def get_snapshot(self) -> Optional[ImmutableBookSnapshot]:
-        """Retorna snapshot imutável atual (sem lock, thread-safe para leitura)."""
-        with self._snapshot_lock:
-            return self._current_snapshot
+        """Retorna snapshot imutável atual (sem lock, thread-safe para leitura).
+        
+        FASE 7: Snapshot é imutável, então leitura não precisa de lock.
+        """
+        # FASE 7: Sem lock - snapshot é imutável, leitura é thread-safe
+        return self._current_snapshot
     
     def get_best_bid(self) -> float:
         """Retorna best bid (sem lock, snapshot imutável)."""
@@ -162,11 +175,13 @@ class BookState:
     def reconcile(self, bids: List[Tuple[float, float]], asks: List[Tuple[float, float]]):
         """Reconcilia com snapshot externo (fora do hot path - FASE 5).
         
+        FASE 7: Single-writer (lock apenas para escrita).
+        
         Args:
             bids: Lista de (price, size) para bids
             asks: Lista de (price, size) para asks
         """
-        with self._lock:
+        with self._write_lock:  # FASE 7: Lock apenas para escrita
             # Comparar e atualizar se necessário
             # Por simplicidade, vamos re-inicializar com o snapshot
             self.initialize_from_snapshot(bids, asks)
@@ -185,26 +200,40 @@ class BookState:
 
 # Gerenciador global de BookStates
 class BookStateManager:
-    """Gerenciador global de BookStates (FASE 5)."""
+    """Gerenciador global de BookStates (FASE 5 + FASE 7).
+    
+    FASE 7: Otimizado com menos locks (lock apenas para criar book).
+    """
     
     def __init__(self):
         self._books: Dict[str, BookState] = {}
         self._lock = threading.Lock()
     
     def get_book(self, market: str) -> BookState:
-        """Retorna ou cria BookState para um mercado."""
-        with self._lock:
-            if market not in self._books:
-                self._books[market] = BookState(market)
-            return self._books[market]
+        """Retorna ou cria BookState para um mercado.
+        
+        FASE 7: Lock apenas para criar book (double-check pattern).
+        """
+        # FASE 7: Double-check pattern (lock apenas se necessário)
+        if market not in self._books:
+            with self._lock:
+                if market not in self._books:  # Double-check
+                    self._books[market] = BookState(market)
+        return self._books[market]
     
     def get_all_books(self) -> Dict[str, BookState]:
-        """Retorna todos os BookStates."""
+        """Retorna todos os BookStates.
+        
+        FASE 7: Lock apenas para copiar dict.
+        """
         with self._lock:
             return self._books.copy()
     
     def remove_book(self, market: str):
-        """Remove BookState de um mercado."""
+        """Remove BookState de um mercado.
+        
+        FASE 7: Lock apenas para remover.
+        """
         with self._lock:
             if market in self._books:
                 del self._books[market]
