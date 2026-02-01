@@ -126,12 +126,20 @@ class SenderTask:
             t_send_start = time.monotonic_ns()
             
             # Preparar e enviar (em thread para não bloquear event loop)
+            # FASE 6: Usar métodos get_price_float/get_size_float se disponível
+            if hasattr(intent, 'get_price_float'):
+                price = intent.get_price_float()
+                size = intent.get_size_float()
+            else:
+                price = intent.price
+                size = intent.size
+            
             result = await asyncio.to_thread(
                 self.client.create_order,
                 intent.market,
                 intent.side,
-                intent.price,
-                intent.size
+                price,
+                size
             )
             
             t_send_end = time.monotonic_ns()

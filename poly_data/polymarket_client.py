@@ -19,6 +19,10 @@ import json
 import subprocess
 from poly_data.abis import NegRiskAdapterABI, ConditionalTokenABI, erc20_abi
 
+# FASE 6: Fixed-point e payload templates
+from poly_data.fixed_point import FixedPointPrice, FixedPointSize, USE_FIXED_POINT, PRICE_SCALE
+from poly_data.payload_template import get_payload_template
+
 load_dotenv()
 
 # FASE 3: Variável de ambiente para controlar verbosidade (reduz I/O de logs)
@@ -147,24 +151,33 @@ class PolymarketClient:
 
     # ... rest of the class unchanged (create_order, get_order_book, etc.) ...
 
-    def create_order(self, marketId, action, price, size, neg_risk=False):
+    def create_order(self, marketId, action, price, size, neg_risk=False, use_fixed_point=True):
         """
         Create and submit a new order to the Polymarket order book.
 
         Args:
             marketId (str): ID of the market token to trade
             action (str): "BUY" or "SELL"
-            price (float): Order price (0-1 range for prediction markets)
-            size (float): Order size in USDC
+            price (float ou int): Order price (0-1 range, ou int se fixed-point)
+            size (float ou int): Order size em USDC
             neg_risk (bool, optional): Whether this is a negative risk market. Defaults to False.
+            use_fixed_point (bool): Se True, usa fixed-point (FASE 6). Defaults to True.
 
         Returns:
             dict: Response from the API containing order details, or empty dict on error
         """
+        # FASE 6: Converter para float apenas na borda (API espera float)
+        if use_fixed_point and USE_FIXED_POINT:
+            price_float = FixedPointPrice.to_float_safe(price)
+            size_float = FixedPointSize.to_float_safe(size)
+        else:
+            price_float = float(price)
+            size_float = float(size)
+        
         order_args = OrderArgs(
             token_id=str(marketId),
-            price=price,
-            size=size,
+            price=price_float,
+            size=size_float,
             side=action
         )
         signed_order = None
