@@ -17,16 +17,22 @@ def get_spreadsheet(read_only=False):
     if not spreadsheet_url:
         raise ValueError("SPREADSHEET_URL environment variable is not set")
     
-    # Check for credentials
-    if not os.path.exists('credentials.json'):
+    # Check for credentials in multiple locations
+    creds_file = None
+    for path in ['secrets/credentials.json', 'credentials.json', '../secrets/credentials.json', '../credentials.json']:
+        if os.path.exists(path):
+            creds_file = path
+            break
+    
+    if not creds_file:
         if read_only:
             return ReadOnlySpreadsheet(spreadsheet_url)
         else:
-            raise FileNotFoundError("credentials.json not found. Use read_only=True for read-only access.")
+            raise FileNotFoundError("credentials.json not found in secrets/credentials.json or credentials.json. Use read_only=True for read-only access.")
     
     # Normal authenticated access
     scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
-    credentials = Credentials.from_service_account_file('credentials.json', scopes=scope)
+    credentials = Credentials.from_service_account_file(creds_file, scopes=scope)
     client = gspread.authorize(credentials)
     spreadsheet = client.open_by_url(spreadsheet_url)
     return spreadsheet

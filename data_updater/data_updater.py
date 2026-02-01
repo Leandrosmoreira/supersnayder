@@ -56,7 +56,14 @@ def get_spreadsheet(read_only=False):
     if not spreadsheet_url:
         logger.error("SPREADSHEET_URL environment variable not set")
         raise ValueError("SPREADSHEET_URL environment variable is not set")
-    creds_file = 'credentials.json' if os.path.exists('credentials.json') else '../credentials.json'
+    # Check for credentials in multiple locations
+    creds_file = None
+    for path in ['secrets/credentials.json', 'credentials.json', '../secrets/credentials.json', '../credentials.json']:
+        if os.path.exists(path):
+            creds_file = path
+            break
+    if not creds_file:
+        creds_file = 'credentials.json'  # Fallback for logging
     logger.info(f"Checking for credentials file at: {creds_file}")
     if not read_only and os.path.exists(creds_file):
         try:

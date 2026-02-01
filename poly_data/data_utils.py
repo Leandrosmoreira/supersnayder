@@ -162,21 +162,45 @@ def update_markets():
     # Process markets if not empty
     if not global_state.df.empty:
         for _, row in global_state.df.iterrows():
-            for col in ['token1', 'token2']:
-                row[col] = str(row[col])
-            if row['token1'] not in global_state.all_tokens:
-                global_state.all_tokens.append(row['token1'])
+            # Handle merged columns (may have _x or _y suffix, or be in Selected Markets directly)
+            token1 = None
+            token2 = None
+            condition_id = None
+            
+            # Try different possible column names
+            for col in ['token1', 'token1_x', 'token1_y']:
+                if col in row and pd.notna(row[col]):
+                    token1 = str(row[col])
+                    break
+            
+            for col in ['token2', 'token2_x', 'token2_y']:
+                if col in row and pd.notna(row[col]):
+                    token2 = str(row[col])
+                    break
+                    
+            for col in ['condition_id', 'condition_id_x', 'condition_id_y']:
+                if col in row and pd.notna(row[col]):
+                    condition_id = str(row[col])
+                    break
+            
+            # Skip if missing required fields
+            if not token1 or not token2 or not condition_id:
+                print(f"Warning: Skipping market {row.get('question', 'Unknown')} - missing token1, token2, or condition_id")
+                continue
+                
+            if token1 not in global_state.all_tokens:
+                global_state.all_tokens.append(token1)
             # Add tokens AND condition_id to subscribed_assets for trading
             # WebSocket subscriptions use token IDs but data comes with condition_id as market field
-            global_state.subscribed_assets.add(str(row['token1']))
-            global_state.subscribed_assets.add(str(row['token2']))
-            global_state.subscribed_assets.add(str(row['condition_id']))
-            if row['token1'] not in global_state.REVERSE_TOKENS:
-                global_state.REVERSE_TOKENS[row['token1']] = row['token2']
-            if row['token2'] not in global_state.REVERSE_TOKENS:
-                global_state.REVERSE_TOKENS[row['token2']] = row['token1']
-            for col2 in [f"{row['token1']}_buy", f"{row['token1']}_sell", f"{row['token2']}_buy",
-                         f"{row['token2']}_sell"]:
+            global_state.subscribed_assets.add(token1)
+            global_state.subscribed_assets.add(token2)
+            global_state.subscribed_assets.add(condition_id)
+            if token1 not in global_state.REVERSE_TOKENS:
+                global_state.REVERSE_TOKENS[token1] = token2
+            if token2 not in global_state.REVERSE_TOKENS:
+                global_state.REVERSE_TOKENS[token2] = token1
+            for col2 in [f"{token1}_buy", f"{token1}_sell", f"{token2}_buy",
+                         f"{token2}_sell"]:
                 if col2 not in global_state.performing:
                     global_state.performing[col2] = set()
         print(f"Loaded {len(global_state.subscribed_assets)} subscribed assets for trading: {global_state.subscribed_assets}")

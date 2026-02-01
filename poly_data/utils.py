@@ -9,8 +9,16 @@ import time
 def get_sheet_df():
     load_dotenv()
     scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
+    # Check for credentials in multiple locations
+    creds_file = None
+    for path in ['secrets/credentials.json', 'credentials.json', '../secrets/credentials.json', '../credentials.json']:
+        if os.path.exists(path):
+            creds_file = path
+            break
+    if not creds_file:
+        creds_file = "credentials.json"  # Fallback for error message
     try:
-        creds = Credentials.from_service_account_file("credentials.json", scopes=scope)
+        creds = Credentials.from_service_account_file(creds_file, scopes=scope)
         client = gspread.authorize(creds)
     except Exception as e:
         print(f"Warning: Falling back to read-only mode for Google Sheets: {str(e)}")

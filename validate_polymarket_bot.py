@@ -80,12 +80,16 @@ def check_auth_and_balance(client):
             raise ConnectionError("Failed to connect to Polygon RPC")
         logging.info(f"Connected to Polygon RPC at {polygon_rpc_url}")
 
-        usdc_contract = w3.eth.contract(address=USDC_ADDRESS, abi=[
+        # Convert address to checksum format (required by web3.py)
+        funder_address_checksum = Web3.to_checksum_address(funder_address)
+        usdc_address_checksum = Web3.to_checksum_address(USDC_ADDRESS)
+
+        usdc_contract = w3.eth.contract(address=usdc_address_checksum, abi=[
             {"constant": True, "inputs": [{"name": "_owner", "type": "address"}],
              "name": "balanceOf", "outputs": [{"name": "balance", "type": "uint256"}],
              "type": "function"}
         ])
-        balance_wei = usdc_contract.functions.balanceOf(funder_address).call()
+        balance_wei = usdc_contract.functions.balanceOf(funder_address_checksum).call()
         balance_usdc = balance_wei / 10 ** 6
         logging.info(f"USDC balance for {funder_address[:10]}...: {balance_usdc} USDC")
         if balance_usdc < 10:

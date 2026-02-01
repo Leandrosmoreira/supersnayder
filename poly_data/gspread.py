@@ -9,7 +9,15 @@ load_dotenv()
 
 def get_spreadsheet():
     scope = ["https://www.googleapis.com/auth/spreadsheets", "https://www.googleapis.com/auth/drive"]
-    creds = Credentials.from_service_account_file("credentials.json", scopes=scope)
+    # Check for credentials in multiple locations
+    creds_file = None
+    for path in ['secrets/credentials.json', 'credentials.json', '../secrets/credentials.json', '../credentials.json']:
+        if os.path.exists(path):
+            creds_file = path
+            break
+    if not creds_file:
+        raise FileNotFoundError("credentials.json not found in secrets/credentials.json or credentials.json")
+    creds = Credentials.from_service_account_file(creds_file, scopes=scope)
     client = gspread.authorize(creds)
     return client.open_by_url(os.getenv("SPREADSHEET_URL"))
 
@@ -39,9 +47,16 @@ def test_gspread():
                 print(f"Error: Failed to write to {ws}. Check Edit permissions: {str(e)}")
         # Print Service Account email
         try:
-            with open("credentials.json") as f:
-                creds = json.load(f)
-                print(f"Service Account Email: {creds['client_email']}")
+            # Find credentials file
+            creds_file = None
+            for path in ['secrets/credentials.json', 'credentials.json', '../secrets/credentials.json', '../credentials.json']:
+                if os.path.exists(path):
+                    creds_file = path
+                    break
+            if creds_file:
+                with open(creds_file) as f:
+                    creds = json.load(f)
+                    print(f"Service Account Email: {creds['client_email']}")
         except Exception as e:
             print(f"Error reading credentials.json: {str(e)}")
     except gspread.exceptions.SpreadsheetNotFound:

@@ -22,10 +22,14 @@ def get_spreadsheet(read_only=False):
     if not spreadsheet_url:
         raise ValueError("SPREADSHEET_URL environment variable is not set")
     
-    # Check for credentials
-    creds_file = 'credentials.json' if os.path.exists('credentials.json') else '../credentials.json'
+    # Check for credentials in multiple locations
+    creds_file = None
+    for path in ['secrets/credentials.json', 'credentials.json', '../credentials.json']:
+        if os.path.exists(path):
+            creds_file = path
+            break
     
-    if not os.path.exists(creds_file):
+    if not creds_file or not os.path.exists(creds_file):
         if read_only:
             return ReadOnlySpreadsheet(spreadsheet_url)
         else:

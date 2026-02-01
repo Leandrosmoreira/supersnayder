@@ -64,21 +64,25 @@ async def connect_market_websocket(chunk, max_retries=5, retry_delay=5):
 
                 try:
                     # Process incoming market data indefinitely
+                    logger.info(f"WebSocket connected and waiting for messages for {len(chunk)} markets...")
                     while True:
                         message = await websocket.recv()
                         try:
                             json_data = json.loads(message)
-                            logger.debug(f"Received market WebSocket message: {json_data}")
-                            # Filter out unsubscribed markets
-                            if isinstance(json_data, dict) and 'market' in json_data:
-                                if json_data['market'] not in chunk:
+                            # Handle both dict and list responses
+                            if isinstance(json_data, list):
+                                logger.info(f"Received market WebSocket message: list with {len(json_data)} items")
+                                await process_data(json_data)
+                            elif isinstance(json_data, dict):
+                                logger.info(f"Received market WebSocket message: {json_data.get('event_type', 'unknown')} for market: {json_data.get('market', 'unknown')}")
+                                # Filter out unsubscribed markets
+                                if 'market' in json_data and json_data['market'] not in chunk:
                                     logger.warning(f"Ignoring data for unsubscribed market: {json_data['market']}")
                                     continue
-                            # Wrap single dictionary in a list for process_data
-                            if isinstance(json_data, dict):
                                 await process_data([json_data])
                             else:
-                                await process_data(json_data)
+                                logger.warning(f"Unexpected message type: {type(json_data)}")
+                                await process_data([json_data] if isinstance(json_data, dict) else json_data)
                         except json.JSONDecodeError as e:
                             logger.error(f"Failed to parse market WebSocket message: {message}. Error: {e}")
                         except Exception as e:

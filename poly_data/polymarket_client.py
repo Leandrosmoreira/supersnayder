@@ -49,7 +49,7 @@ class PolymarketClient:
                 key=self.key,
                 chain_id=self.chain_id,
                 funder=self.browser_wallet,
-                signature_type=2
+                signature_type=1
             )
         except Exception as e:
             raise RuntimeError(f"Failed to initialize ClobClient. Check your PK and network connection. Error: {e}")

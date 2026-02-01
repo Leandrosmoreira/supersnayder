@@ -117,9 +117,20 @@ def log_position_snapshot():
                 token_id = pos.get('asset_id', 'Unknown')
                 position_value = size * market_price
 
+                # Safely convert token_id to string, handling 'Unknown' or non-numeric values
+                if not token_id or token_id == 'Unknown':
+                    token_id_str = ''
+                else:
+                    try:
+                        # Try to convert to int if it's a number
+                        token_id_str = str(int(float(token_id)))
+                    except (ValueError, TypeError):
+                        # If conversion fails, just use the string representation
+                        token_id_str = str(token_id)
+
                 rows_to_add.append([
                     timestamp, wallet_address, f"{usdc_balance:.2f}", f"{pos_balance:.2f}",
-                    f"{total_balance:.2f}", market[:100], outcome, str(int(token_id)) if token_id else '', f"{size:.2f}",
+                    f"{total_balance:.2f}", market[:100], outcome, token_id_str, f"{size:.2f}",
                     f"{avg_price:.4f}", f"{market_price:.4f}", f"{total_pnl:.2f}",
                     f"{pnl_percent:.2f}", f"{position_value:.2f}", int(order_count)
                 ])
