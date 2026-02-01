@@ -75,21 +75,30 @@ async def process_data(json_datas, trade=True):
 
             # Validate market is in subscribed assets
             subscribed_assets = getattr(global_state, 'subscribed_assets', set())
+            
+            # Log detailed information about the market check
+            logger.debug(f"Checking market {asset}: in subscribed_assets={asset in subscribed_assets}, subscribed_assets size={len(subscribed_assets)}")
+            
             if asset not in subscribed_assets:
                 # IN AGGRESSIVE MODE: Process ALL markets, not just subscribed ones
                 import os
                 if os.getenv('AGGRESSIVE_MODE', 'false').lower() != 'true':
-                    logger.warning(f"Received data for unsubscribed market: {asset}, json_data: {json_data}")
+                    logger.debug(f"Received data for unsubscribed market: {asset} (event_type: {event_type}). Subscribed assets: {list(subscribed_assets)[:3]}...")
                     continue
                 else:
                     logger.info(f"AGGRESSIVE MODE: Processing unsubscribed market: {asset}")
 
-            logger.info(f"Processing event_type: {event_type} for market: {asset}")
+            logger.info(f"✅ Processing event_type: {event_type} for market: {asset} (subscribed)")
 
             if event_type == 'book':
+                logger.info(f"📖 Received BOOK snapshot for market: {asset}")
+                bids_count = len(json_data.get('bids', []))
+                asks_count = len(json_data.get('asks', []))
+                logger.info(f"   Book has {bids_count} bids and {asks_count} asks")
                 process_book_data(asset, json_data)
                 if trade:
                     # Always trade on book snapshot (initial data)
+                    logger.info(f"🚀 Triggering perform_trade for market: {asset} (book snapshot)")
                     await asyncio.create_task(perform_trade(asset))
             elif event_type == 'price_change':
                 # Check for 'price_changes' (new API) or 'changes' (legacy)
@@ -114,10 +123,10 @@ async def process_data(json_datas, trade=True):
                     # Only trigger trading if 30 seconds have passed since last action
                     if time_since_last_action >= 30:
                         global_state.last_trade_action_time[asset] = current_time
-                        logger.info(f"Triggering trade for {asset} after {time_since_last_action:.1f}s cooldown")
+                        logger.info(f"🚀 Triggering trade for {asset} after {time_since_last_action:.1f}s cooldown (price_change event)")
                         await asyncio.create_task(perform_trade(asset))
                     else:
-                        logger.debug(f"Skipping trade for {asset}, cooldown: {30 - time_since_last_action:.1f}s remaining")
+                        logger.debug(f"⏳ Skipping trade for {asset}, cooldown: {30 - time_since_last_action:.1f}s remaining")
             else:
                 logger.warning(f"Unhandled event_type: {event_type}")
         except Exception as e:

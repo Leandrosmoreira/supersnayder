@@ -74,11 +74,21 @@ async def connect_market_websocket(chunk, max_retries=5, retry_delay=5):
                                 logger.info(f"Received market WebSocket message: list with {len(json_data)} items")
                                 await process_data(json_data)
                             elif isinstance(json_data, dict):
-                                logger.info(f"Received market WebSocket message: {json_data.get('event_type', 'unknown')} for market: {json_data.get('market', 'unknown')}")
-                                # Filter out unsubscribed markets
-                                if 'market' in json_data and json_data['market'] not in chunk:
-                                    logger.warning(f"Ignoring data for unsubscribed market: {json_data['market']}")
-                                    continue
+                                event_type = json_data.get('event_type', 'unknown')
+                                market_id = json_data.get('market', 'unknown')
+                                logger.info(f"Received market WebSocket message: {event_type} for market: {market_id}")
+                                
+                                # Filter out unsubscribed markets - use subscribed_assets instead of chunk
+                                # subscribed_assets contains condition_ids, token1, token2 (all valid market identifiers)
+                                subscribed_assets = getattr(global_state, 'subscribed_assets', set())
+                                if 'market' in json_data:
+                                    market = json_data['market']
+                                    # Check if market is in subscribed_assets (condition_id) or in chunk (token IDs)
+                                    if market not in subscribed_assets and market not in chunk:
+                                        logger.debug(f"Ignoring data for unsubscribed market: {market} (not in subscribed_assets or chunk)")
+                                        continue
+                                    else:
+                                        logger.debug(f"Processing market {market} - found in subscribed assets: {market in subscribed_assets}, in chunk: {market in chunk}")
                                 await process_data([json_data])
                             else:
                                 logger.warning(f"Unexpected message type: {type(json_data)}")

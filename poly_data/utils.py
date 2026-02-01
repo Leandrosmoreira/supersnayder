@@ -123,7 +123,19 @@ def get_sheet_df():
     # Merge Selected Markets with All Markets to get full market details
     if len(df_selected) > 0 and len(df_all) > 0:
         # Merge on 'question' column to get full market data for selected markets
-        df_merged = df_selected.merge(df_all, on='question', how='left')
+        df_merged = df_selected.merge(df_all, on='question', how='left', suffixes=('', '_y'))
+        
+        # Normalize column names after merge - prefer values from All Markets (no suffix or _y)
+        # Copy token1, token2, condition_id from merged columns if they exist
+        for col in ['token1', 'token2', 'condition_id']:
+            # Try _y suffix first (from All Markets), then original, then _x (from Selected)
+            if f'{col}_y' in df_merged.columns:
+                df_merged[col] = df_merged[f'{col}_y'].fillna(df_merged.get(col, ''))
+                df_merged = df_merged.drop(columns=[f'{col}_y'])
+            elif f'{col}_x' in df_merged.columns:
+                df_merged[col] = df_merged[f'{col}_x'].fillna(df_merged.get(col, ''))
+                df_merged = df_merged.drop(columns=[f'{col}_x'])
+        
         print(f"Merged {len(df_merged)} selected markets with All Markets data")
         return df_merged, hyperparams
     elif len(df_selected) > 0:
