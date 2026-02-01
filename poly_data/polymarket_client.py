@@ -224,7 +224,14 @@ class PolymarketClient:
     def get_pos_balance(self):
         # FASE 1: Usar sessão reutilizável em vez de requests.get
         res = self.session.get(f'https://data-api.polymarket.com/value?user={self.browser_wallet}')
-        return float(res.json()['value'])
+        # FASE 2: Otimizar parsing JSON
+        if _USE_ORJSON:
+            data = orjson.loads(res.content)
+        elif _USE_UJSON:
+            data = ujson.loads(res.text)
+        else:
+            data = res.json()
+        return float(data['value'])
 
     def get_total_balance(self):
         return self.get_usdc_balance() + self.get_pos_balance()
