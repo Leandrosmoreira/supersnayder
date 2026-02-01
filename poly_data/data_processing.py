@@ -7,6 +7,7 @@ import logging
 import time
 from trading import perform_trade
 from poly_data.data_utils import set_position, set_order, update_positions
+from poly_data.book_state import book_state_manager  # FASE 5
 
 # Configure logging
 logging.basicConfig(
@@ -31,7 +32,11 @@ def initialize_market_data(asset):
 
 
 def process_book_data(asset, json_data):
-    """Process book data for a given asset."""
+    """Process book data for a given asset.
+    
+    FASE 5: Atualiza BookState via WebSocket (zero HTTP no hot path).
+    """
+    # Manter compatibilidade com código antigo
     initialize_market_data(asset)
     global_state.all_data[asset]['bids'].clear()
     global_state.all_data[asset]['asks'].clear()
@@ -39,16 +44,55 @@ def process_book_data(asset, json_data):
         {float(entry['price']): float(entry['size']) for entry in json_data['bids']})
     global_state.all_data[asset]['asks'].update(
         {float(entry['price']): float(entry['size']) for entry in json_data['asks']})
+    
+    # FASE 5: Atualizar BookState (WebSocket-first)
+    try:
+        book_state = book_state_manager.get_book(asset)
+        
+        # Converter para lista de tuplas
+        bids = [(float(entry['price']), float(entry['size'])) for entry in json_data.get('bids', [])]
+        asks = [(float(entry['price']), float(entry['size'])) for entry in json_data.get('asks', [])]
+        
+        # Inicializar ou atualizar BookState
+        if not book_state.initialized:
+            book_state.initialize_from_snapshot(bids, asks)
+        else:
+            # Aplicar como delta (pode ser snapshot completo)
+            asyncio.create_task(book_state.apply_delta({
+                'bids': json_data.get('bids', []),
+                'asks': json_data.get('asks', [])
+            }))
+    except Exception as e:
+        logger.error(f"Erro ao atualizar BookState para {asset}: {e}")
 
 
 def process_price_change(asset, side, price_level, new_size):
-    """Process price change for a given asset and side."""
+    """Process price change for a given asset and side.
+    
+    FASE 5: Atualiza BookState via WebSocket (zero HTTP no hot path).
+    """
+    # Manter compatibilidade com código antigo
     book = global_state.all_data[asset]['bids'] if side == 'bids' else global_state.all_data[asset]['asks']
     if new_size == 0:
         if price_level in book:
             del book[price_level]
     else:
         book[price_level] = new_size
+    
+    # FASE 5: Atualizar BookState (WebSocket-first)
+    try:
+        book_state = book_state_manager.get_book(asset)
+        
+        # Aplicar delta
+        delta = {
+            side: [{
+                'price': str(price_level),
+                'size': str(new_size) if new_size > 0 else '0'
+            }]
+        }
+        asyncio.create_task(book_state.apply_delta(delta))
+    except Exception as e:
+        logger.error(f"Erro ao atualizar BookState (price_change) para {asset}: {e}")
 
 
 async def process_data(json_datas, trade=True):

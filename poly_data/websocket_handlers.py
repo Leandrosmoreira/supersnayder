@@ -86,7 +86,7 @@ async def connect_market_websocket(chunk, max_retries=5, retry_delay=5):
                                     # Check if market is in subscribed_assets (condition_id) or in chunk (token IDs)
                                     if market not in subscribed_assets and market not in chunk:
                                         logger.debug(f"Ignoring data for unsubscribed market: {market} (not in subscribed_assets or chunk)")
-                                        continue
+                                    continue
                                     else:
                                         logger.debug(f"Processing market {market} - found in subscribed assets: {market in subscribed_assets}, in chunk: {market in chunk}")
                                 await process_data([json_data])

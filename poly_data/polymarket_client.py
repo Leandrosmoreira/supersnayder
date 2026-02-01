@@ -57,7 +57,7 @@ class PolymarketClient:
         self._creds_cache = None  # Cache de credenciais
         self._order_book_cache = {}  # Cache de order books
         self._order_book_cache_ttl = 0.5  # TTL de 500ms para order book cache
-        
+
         try:
             self.client = ClobClient(
                 host=self.host,

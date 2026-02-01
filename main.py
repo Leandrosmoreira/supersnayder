@@ -10,6 +10,8 @@ from poly_data.websocket_handlers import connect_market_websocket, connect_user_
 import poly_data.global_state as global_state
 from poly_data.data_processing import remove_from_performing
 from poly_data.position_snapshot import log_position_snapshot
+from poly_data.book_state import book_state_manager  # FASE 5
+from poly_data.reconcile_task import reconcile_task  # FASE 5
 from dotenv import load_dotenv
 from data_updater.google_utils import get_spreadsheet  # Import to access Google Sheet
 
@@ -120,6 +122,33 @@ async def main():
 
     # Start periodic updates as an async task
     asyncio.create_task(update_periodically())
+    
+    # FASE 5: Inicializar BookStates com snapshot inicial (HTTP - apenas 1x)
+    logger.info("FASE 5: Inicializando BookStates com snapshot inicial...")
+    try:
+        subscribed_list = list(global_state.subscribed_assets)
+        logger.info(f"Inicializando BookStates para {len(subscribed_list)} mercados...")
+        for idx, market_token in enumerate(subscribed_list[:10]):  # Limitar a 10 para não sobrecarregar
+            try:
+                order_book_result = global_state.client.get_order_book(market_token)
+                if order_book_result and len(order_book_result) == 2:
+                    bids_df, asks_df = order_book_result
+                    bids = [(float(row['price']), float(row['size'])) for _, row in bids_df.iterrows()]
+                    asks = [(float(row['price']), float(row['size'])) for _, row in asks_df.iterrows()]
+                    
+                    book_state = book_state_manager.get_book(market_token)
+                    book_state.initialize_from_snapshot(bids, asks)
+                    if (idx + 1) % 5 == 0:
+                        logger.info(f"✓ {idx + 1}/{min(10, len(subscribed_list))} BookStates inicializados...")
+            except Exception as e:
+                logger.warning(f"Erro ao inicializar BookState para {market_token[:20]}...: {e}")
+        logger.info("✓ BookStates inicializados com sucesso")
+    except Exception as e:
+        logger.error(f"Erro ao inicializar BookStates: {e}")
+    
+    # FASE 5: Iniciar reconcile task (fora do hot path - a cada 15s)
+    logger.info("FASE 5: Iniciando reconcile task (intervalo: 15s)...")
+    asyncio.create_task(reconcile_task(global_state.client))
 
     # Main loop - maintain websocket connections with backoff
     backoff_time = 5

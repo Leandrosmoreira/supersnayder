@@ -55,8 +55,8 @@ def test_gspread():
                     break
             if creds_file:
                 with open(creds_file) as f:
-                    creds = json.load(f)
-                    print(f"Service Account Email: {creds['client_email']}")
+                creds = json.load(f)
+                print(f"Service Account Email: {creds['client_email']}")
         except Exception as e:
             print(f"Error reading credentials.json: {str(e)}")
     except gspread.exceptions.SpreadsheetNotFound:
