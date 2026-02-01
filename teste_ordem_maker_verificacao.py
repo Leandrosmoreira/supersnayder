@@ -16,6 +16,9 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from poly_data.polymarket_client import PolymarketClient
 from poly_data.utils import get_sheet_df
+from poly_data.latency_metrics import metrics
+from poly_data.order_intent import OrderIntent
+from poly_data.sender_task import SenderTask
 
 # Carregar variáveis de ambiente
 load_dotenv()
