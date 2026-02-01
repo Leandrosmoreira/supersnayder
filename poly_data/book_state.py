@@ -58,9 +58,14 @@ class BookState:
         self.asks: SortedDict = SortedDict()  # price -> size (ordenado crescente)
         self.last_update_ns: int = 0
         self.last_snapshot_ns: int = 0
-        self._lock = threading.Lock()
+        
+        # FASE 7: Single-writer lock (apenas uma task escreve)
+        self._write_lock = threading.Lock()
+        
+        # FASE 7: Snapshot imutável (leitura sem lock)
         self._current_snapshot: Optional[ImmutableBookSnapshot] = None
-        self._snapshot_lock = threading.Lock()
+        # Não precisa de lock para leitura (snapshot é imutável)
+        
         self.initialized = False
     
     def initialize_from_snapshot(self, bids: List[Tuple[float, float]], asks: List[Tuple[float, float]]):

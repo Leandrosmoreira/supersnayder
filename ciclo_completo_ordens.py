@@ -144,7 +144,9 @@ def ciclo_completo_ordens():
         
         if resultado_up and 'orderID' in resultado_up:
             order_id_up = resultado_up['orderID']
-            print(f"      ✅ Ordem BUY UP criada! Order ID: {order_id_up[:20]}...")
+            print(f"      ✅ Ordem BUY UP criada!")
+            print(f"      📋 Order ID (HASH): {order_id_up}")
+            print(f"      📋 Order ID (curto): {order_id_up[:20]}...")
             orders_criadas.append({
                 'order_id': order_id_up,
                 'token': token1,
@@ -153,6 +155,8 @@ def ciclo_completo_ordens():
             })
         else:
             print(f"      ❌ Falha ao criar ordem BUY UP")
+            if resultado_up:
+                print(f"      📋 Resposta recebida: {resultado_up}")
             return False
         
         # Criar ordem BUY DOWN
@@ -161,7 +165,9 @@ def ciclo_completo_ordens():
         
         if resultado_down and 'orderID' in resultado_down:
             order_id_down = resultado_down['orderID']
-            print(f"      ✅ Ordem BUY DOWN criada! Order ID: {order_id_down[:20]}...")
+            print(f"      ✅ Ordem BUY DOWN criada!")
+            print(f"      📋 Order ID (HASH): {order_id_down}")
+            print(f"      📋 Order ID (curto): {order_id_down[:20]}...")
             orders_criadas.append({
                 'order_id': order_id_down,
                 'token': token2,
@@ -170,6 +176,8 @@ def ciclo_completo_ordens():
             })
         else:
             print(f"      ❌ Falha ao criar ordem BUY DOWN")
+            if resultado_down:
+                print(f"      📋 Resposta recebida: {resultado_down}")
             # Cancelar a primeira se a segunda falhou
             try:
                 client.cancel_all_asset(token1)
@@ -258,7 +266,15 @@ def ciclo_completo_ordens():
     print("  📊 RESUMO DO CICLO")
     print("=" * 80)
     print(f"   ✅ Ordens criadas: {len(orders_criadas)}")
-    print(f"   ⏱️  Tempo de criação: {tempo_criacao*1000:.2f}ms")
+    
+    # Mostrar hashes das ordens criadas
+    print(f"\n   📋 HASHES DAS ORDENS CRIADAS:")
+    for idx, order in enumerate(orders_criadas, 1):
+        print(f"      {idx}. {order['tipo']}:")
+        print(f"         Order ID (HASH): {order['order_id']}")
+        print(f"         Token: {order['token'][:30]}...")
+    
+    print(f"\n   ⏱️  Tempo de criação: {tempo_criacao*1000:.2f}ms")
     print(f"   ⏱️  Tempo de espera: 30.00s")
     print(f"   ⏱️  Tempo de cancelamento: {tempo_cancelamento*1000:.2f}ms")
     print(f"   ✅ Ordens canceladas: {canceladas}")

@@ -12,6 +12,15 @@ import os
 import math
 import poly_data.global_state as global_state
 
+# FASE 8: Cython para cálculos otimizados
+try:
+    from poly_data.cython_wrapper import compute_spread_fast, compute_quote_fast
+    CYTHON_AVAILABLE = True
+except ImportError:
+    CYTHON_AVAILABLE = False
+    compute_spread_fast = None
+    compute_quote_fast = None
+
 load_dotenv()
 
 def get_clob_client():

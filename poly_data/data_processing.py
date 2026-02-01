@@ -9,6 +9,15 @@ from trading import perform_trade
 from poly_data.data_utils import set_position, set_order, update_positions
 from poly_data.book_state import book_state_manager  # FASE 5
 
+# FASE 8: Cython para cálculos otimizados
+try:
+    from poly_data.cython_wrapper import compute_spread_fast, compute_quote_fast
+    CYTHON_AVAILABLE = True
+except ImportError:
+    CYTHON_AVAILABLE = False
+    compute_spread_fast = None
+    compute_quote_fast = None
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,

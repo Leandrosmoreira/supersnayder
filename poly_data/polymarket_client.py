@@ -22,6 +22,7 @@ from poly_data.abis import NegRiskAdapterABI, ConditionalTokenABI, erc20_abi
 # FASE 6: Fixed-point e payload templates
 from poly_data.fixed_point import FixedPointPrice, FixedPointSize, USE_FIXED_POINT, PRICE_SCALE
 from poly_data.payload_template import get_payload_template
+from poly_data.cython_wrapper import build_order_payload_fast as cython_build_payload
 
 load_dotenv()
 
@@ -148,8 +149,6 @@ class PolymarketClient:
             'Connection': 'keep-alive',
             'Keep-Alive': 'timeout=60, max=1000'
         })
-
-    # ... rest of the class unchanged (create_order, get_order_book, etc.) ...
 
     def create_order(self, marketId, action, price, size, neg_risk=False, use_fixed_point=True):
         """
