@@ -1,32 +1,32 @@
-TESTE DE ORDENS MAKER (BUY UP + BUY DOWN) - 2026-02-01 14:20:31
+TESTE DE ORDENS MAKER (BUY UP + BUY DOWN) - 2026-02-01 14:27:15
 ================================================================================
 Mercado: S&P 500 (SPX) Opens Up or Down on February 2?
 Condition ID: 0xd7bd6da90fbd3bc27d0daebe212c8b2e7c6e1bdb223cf9df4212caf5954c83f2
 
 ORDEM 1 - ORDEM 1 - BUY UP:
-  Order ID: 0x38c249fa837ff4233f029f9276fdc3b7207384d08b21adf6fd7812a0279d32c6
+  Order ID: 0xd452b18a6329dbc351bbd07ae18542c4a4b6d5fcab23b525619c1b5b2c5c8889
   Token: 65780955130751483806743069659869291836547149647751437276124202586507306050922
   Lado: BUY
   Preço: $0.010000
   Tamanho: 5.00 shares
 
 ORDEM 2 - ORDEM 2 - BUY DOWN:
-  Order ID: 0x5ca9b9b4741b8a4abc20bce2fcd3a48571ff7fea2dd1d9d9ab5635d0677c8a40
+  Order ID: 0xcc81efa46e9034c793b8bed3a9e235a13aef3fb226801c54d6db1650259d0d3f
   Token: 96421258818435207111738576752638866413484960115603529317898048867111710061805
   Lado: BUY
   Preço: $0.010000
   Tamanho: 5.00 shares
 
 
-CANCELADAS EM: 2026-02-01 14:21:02
-Tempo decorrido: 30.5 segundos
-Ordens restantes no order book: 0
+CANCELADAS EM: 2026-02-01 14:27:46
+Tempo decorrido: 30.4 segundos
+Ordens restantes no order book: 1
 
 LATÊNCIA (VPS -> Polymarket):
 ================================================================================
 
 ORDEM 1 - ORDEM 1 - BUY UP:
-  Enviada em: 2026-02-01 14:20:31.676
+  Enviada em: 2026-02-01 14:27:15.665
 
 ORDEM 2 - ORDEM 2 - BUY DOWN:
-  Enviada em: 2026-02-01 14:20:31.677
+  Enviada em: 2026-02-01 14:27:15.666

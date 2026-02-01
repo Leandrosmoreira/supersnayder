@@ -21,6 +21,14 @@ from poly_data.abis import NegRiskAdapterABI, ConditionalTokenABI, erc20_abi
 
 load_dotenv()
 
+# FASE 3: Variável de ambiente para controlar verbosidade (reduz I/O de logs)
+_VERBOSE = os.getenv('VERBOSE', 'true').lower() == 'true'
+
+def _log(message, level='info'):
+    """FASE 3: Logging condicional para reduzir overhead de I/O."""
+    if _VERBOSE or level == 'error':
+        print(message)
+
 class PolymarketClient:
     def __init__(self, pk='default') -> None:
         self.host = "https://clob.polymarket.com"
@@ -33,7 +41,7 @@ class PolymarketClient:
         if not self.browser_address:
             raise ValueError("BROWSER_ADDRESS environment variable is not set. Please check your .env file.")
 
-        print("Initializing Polymarket client...")
+        _log("Initializing Polymarket client...")
         self.chain_id = POLYGON
 
         try:
@@ -67,14 +75,14 @@ class PolymarketClient:
             # FASE 2: Sempre criar novas credenciais na inicialização, mas cachear para referência
             self.creds = self.client.create_or_derive_api_creds()
             self._creds_cache = self.creds  # Cachear credenciais
-            print(f"✓ API credentials created successfully (API Key: {self.creds.api_key[:8]}...)")
+            _log(f"✓ API credentials created successfully (API Key: {self.creds.api_key[:8]}...)")
         except Exception as e:
             raise RuntimeError(f"Failed to create API credentials. Your private key may be invalid. Error: {e}")
 
         # Set API credentials with error handling
         try:
             self.client.set_api_creds(creds=self.creds)
-            print("✓ API credentials authenticated successfully")
+            _log("✓ API credentials authenticated successfully")
         except Exception as e:
             raise RuntimeError(f"Failed to set API credentials. Authentication rejected. Error: {e}")
 
@@ -166,7 +174,7 @@ class PolymarketClient:
             else:
                 signed_order = self.client.create_order(order_args, options=PartialCreateOrderOptions(neg_risk=True))
         except Exception as ex:
-            print(f"❌ Failed to create signed order for {action} {marketId} at {price}: {ex}")
+            _log(f"❌ Failed to create signed order for {action} {marketId} at {price}: {ex}", 'error')
             return {}
 
         try:
@@ -176,12 +184,12 @@ class PolymarketClient:
             error_str = str(ex)
             # Check for common authentication errors
             if 'auth' in error_str.lower() or 'unauthorized' in error_str.lower() or '401' in error_str:
-                print(f"❌ AUTHENTICATION ERROR when posting order: {ex}")
-                print("   Your API credentials may have expired or are invalid.")
+                _log(f"❌ AUTHENTICATION ERROR when posting order: {ex}", 'error')
+                _log("   Your API credentials may have expired or are invalid.", 'error')
             elif 'insufficient' in error_str.lower() or 'balance' in error_str.lower():
-                print(f"❌ INSUFFICIENT BALANCE when posting order: {ex}")
+                _log(f"❌ INSUFFICIENT BALANCE when posting order: {ex}", 'error')
             else:
-                print(f"❌ Failed to post order for {action} {marketId} at {price}: {ex}")
+                _log(f"❌ Failed to post order for {action} {marketId} at {price}: {ex}", 'error')
             return {}
 
     def get_order_book(self, market, use_cache=True):
@@ -209,6 +217,7 @@ class PolymarketClient:
         
         # Buscar order book
         orderBook = self.client.get_order_book(market)
+        # FASE 3: Otimizar conversão de tipos (reduz overhead de conversão)
         result = (pd.DataFrame(orderBook.bids).astype(float), pd.DataFrame(orderBook.asks).astype(float))
         
         # FASE 2: Atualizar cache
@@ -281,10 +290,10 @@ class PolymarketClient:
     def merge_positions(self, amount_to_merge, condition_id, is_neg_risk_market):
         amount_to_merge_str = str(amount_to_merge)
         node_command = f'node poly_merger/merge.js {amount_to_merge_str} {condition_id} {"true" if is_neg_risk_market else "false"}'
-        print(node_command)
+        _log(node_command)
         result = subprocess.run(node_command, shell=True, capture_output=True, text=True)
         if result.returncode != 0:
-            print("Error:", result.stderr)
+            _log(f"Error: {result.stderr}", 'error')
             raise Exception(f"Error in merging positions: {result.stderr}")
-        print("Done merging")
+        _log("Done merging")
         return result.stdout

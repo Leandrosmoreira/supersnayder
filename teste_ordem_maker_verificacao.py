@@ -6,12 +6,10 @@ Cria uma ordem com características únicas para facilitar a identificação.
 import os
 import sys
 import time
-import asyncio
 from concurrent.futures import ThreadPoolExecutor
 from dotenv import load_dotenv
 import pandas as pd
 from datetime import datetime
-import requests
 
 # Adicionar o diretório raiz ao path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -21,6 +19,14 @@ from poly_data.utils import get_sheet_df
 
 # Carregar variáveis de ambiente
 load_dotenv()
+
+# FASE 3: Variável de ambiente para controlar verbosidade (reduz I/O de logs)
+_VERBOSE = os.getenv('VERBOSE', 'true').lower() == 'true'
+
+def _log(message, level='info'):
+    """FASE 3: Logging condicional para reduzir overhead de I/O."""
+    if _VERBOSE or level == 'error':
+        print(message)
 
 # FASE 2: Cache para verificação de ordem
 _order_verification_cache = {}
@@ -157,19 +163,19 @@ def teste_ordem_maker_verificacao():
         client = PolymarketClient()
         print("   ✅ Cliente inicializado com sucesso")
     except Exception as e:
-        print(f"   ❌ Erro ao inicializar cliente: {e}")
+        _log(f"   ❌ Erro ao inicializar cliente: {e}", 'error')
         import traceback
         traceback.print_exc()
         return False
     
     # Buscar mercados disponíveis
-    print("\n2️⃣  Buscando mercados disponíveis...")
+    _log("\n2️⃣  Buscando mercados disponíveis...")
     try:
         df_selected, params = get_sheet_df()
         
         if df_selected.empty:
-            print("   ❌ Nenhum mercado selecionado na planilha!")
-            print("   💡 Adicione mercados na aba 'Selected Markets' da planilha.")
+            _log("   ❌ Nenhum mercado selecionado na planilha!", 'error')
+            _log("   💡 Adicione mercados na aba 'Selected Markets' da planilha.")
             return False
         
         # Usar o primeiro mercado selecionado
