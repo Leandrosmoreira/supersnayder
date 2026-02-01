@@ -6,6 +6,8 @@ Cria uma ordem com características únicas para facilitar a identificação.
 import os
 import sys
 import time
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
 from dotenv import load_dotenv
 import pandas as pd
 from datetime import datetime
@@ -341,105 +343,100 @@ def teste_ordem_maker_verificacao():
     except EOFError:
         print("⚠️  Ambiente não-interativo. Enviando automaticamente...")
     
-    # Enviar duas ordens
-    print("\n6️⃣  Enviando duas ordens maker...")
+    # FASE 1: Paralelização - Enviar duas ordens em paralelo
+    print("\n6️⃣  Enviando duas ordens maker (PARALELO - Fase 1)...")
     timestamp_criacao = datetime.now()
     orders_criadas = []
     
     try:
-        # Ordem 1: BUY UP
-        print(f"\n   📤 Enviando ORDEM 1 - BUY UP (Token 'Yes')...")
-        result_up = client.create_order(
-            token_up,
-            lado_up,
-            preco_up,
-            tamanho,
-            neg_risk=False
-        )
-        
-        if result_up:
-            order_id_up = result_up.get('orderID', 'N/A')
-            timestamp_envio_up = time.time()
-            timestamp_envio_up_str = datetime.fromtimestamp(timestamp_envio_up).strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
+        # FASE 1: Função para enviar ordem (para usar em paralelo)
+        def enviar_ordem(token, lado, preco, tamanho, tipo):
+            """Envia uma ordem e retorna resultado com timestamp."""
+            timestamp_envio = time.time()
+            timestamp_envio_str = datetime.fromtimestamp(timestamp_envio).strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
             
-            orders_criadas.append({
-                'order_id': order_id_up,
-                'token': token_up,
-                'lado': lado_up,
-                'preco': preco_up,
-                'tamanho': tamanho,
-                'tipo': 'BUY UP',
-                'timestamp_envio': timestamp_envio_up,
-                'timestamp_envio_str': timestamp_envio_up_str
-            })
-            print(f"      ✅ Ordem 1 criada! Order ID: {order_id_up[:20]}...")
-            print(f"      ⏰ Timestamp de envio: {timestamp_envio_up_str}")
+            print(f"   📤 Enviando {tipo}...")
+            result = client.create_order(token, lado, preco, tamanho, neg_risk=False)
             
-            # Verificar quando a ordem aparece no order book
-            print(f"\n   🔍 Medindo latência da ORDEM 1...")
-            resultado_verificacao_up = verificar_ordem_no_orderbook(
-                client, token_up, preco_up, lado_up, tamanho, order_id=order_id_up, timeout=15
-            )
-            orders_criadas[-1]['verificacao'] = resultado_verificacao_up
-            
-            if resultado_verificacao_up['encontrada']:
-                latencia_ms = resultado_verificacao_up['tempo_decorrido'] * 1000
-                print(f"      ✅ Latência: {latencia_ms:.2f}ms ({resultado_verificacao_up['tempo_decorrido']:.3f}s)")
+            if result:
+                order_id = result.get('orderID', 'N/A')
+                print(f"      ✅ {tipo} criada! Order ID: {order_id[:20]}...")
+                print(f"      ⏰ Timestamp de envio: {timestamp_envio_str}")
+                return {
+                    'order_id': order_id,
+                    'token': token,
+                    'lado': lado,
+                    'preco': preco,
+                    'tamanho': tamanho,
+                    'tipo': tipo,
+                    'timestamp_envio': timestamp_envio,
+                    'timestamp_envio_str': timestamp_envio_str,
+                    'success': True
+                }
             else:
-                print(f"      ⚠️  Ordem não encontrada no order book dentro do timeout")
-        else:
-            print(f"      ❌ Falha ao criar ordem 1")
+                print(f"      ❌ Falha ao criar {tipo}")
+                return {'success': False, 'tipo': tipo}
+        
+        # FASE 1: Enviar ordens em paralelo usando ThreadPoolExecutor
+        print("   🚀 Enviando ordens em PARALELO (otimização Fase 1)...")
+        inicio_paralelo = time.time()
+        
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            future_up = executor.submit(
+                enviar_ordem, token_up, lado_up, preco_up, tamanho, 'ORDEM 1 - BUY UP'
+            )
+            future_down = executor.submit(
+                enviar_ordem, token_down, lado_down, preco_down, tamanho, 'ORDEM 2 - BUY DOWN'
+            )
+            
+            # Aguardar ambas as ordens
+            resultado_up = future_up.result()
+            resultado_down = future_down.result()
+        
+        tempo_paralelo = time.time() - inicio_paralelo
+        print(f"\n   ⚡ Tempo total (paralelo): {tempo_paralelo*1000:.2f}ms")
+        
+        # Verificar resultados
+        if not resultado_up.get('success'):
+            print(f"   ❌ Falha ao criar ordem 1")
             return False
         
-        # Ordem 2: BUY DOWN
-        print(f"\n   📤 Enviando ORDEM 2 - BUY DOWN (Token 'No')...")
-        result_down = client.create_order(
-            token_down,
-            lado_down,
-            preco_down,
-            tamanho,
-            neg_risk=False
-        )
-        
-        if result_down:
-            order_id_down = result_down.get('orderID', 'N/A')
-            timestamp_envio_down = time.time()
-            timestamp_envio_down_str = datetime.fromtimestamp(timestamp_envio_down).strftime('%Y-%m-%d %H:%M:%S.%f')[:-3]
-            
-            orders_criadas.append({
-                'order_id': order_id_down,
-                'token': token_down,
-                'lado': lado_down,
-                'preco': preco_down,
-                'tamanho': tamanho,
-                'tipo': 'BUY DOWN',
-                'timestamp_envio': timestamp_envio_down,
-                'timestamp_envio_str': timestamp_envio_down_str
-            })
-            print(f"      ✅ Ordem 2 criada! Order ID: {order_id_down[:20]}...")
-            print(f"      ⏰ Timestamp de envio: {timestamp_envio_down_str}")
-            
-            # Verificar quando a ordem aparece no order book
-            print(f"\n   🔍 Medindo latência da ORDEM 2...")
-            resultado_verificacao_down = verificar_ordem_no_orderbook(
-                client, token_down, preco_down, lado_down, tamanho, order_id=order_id_down, timeout=15
-            )
-            orders_criadas[-1]['verificacao'] = resultado_verificacao_down
-            
-            if resultado_verificacao_down['encontrada']:
-                latencia_ms = resultado_verificacao_down['tempo_decorrido'] * 1000
-                print(f"      ✅ Latência: {latencia_ms:.2f}ms ({resultado_verificacao_down['tempo_decorrido']:.3f}s)")
-            else:
-                print(f"      ⚠️  Ordem não encontrada no order book dentro do timeout")
-        else:
-            print(f"      ❌ Falha ao criar ordem 2")
+        if not resultado_down.get('success'):
+            print(f"   ❌ Falha ao criar ordem 2")
             # Cancelar a primeira ordem se a segunda falhou
-            if orders_criadas:
-                try:
-                    client.cancel_all_asset(token_up)
-                except:
-                    pass
+            try:
+                client.cancel_all_asset(token_up)
+            except:
+                pass
             return False
+        
+        # Adicionar ordens criadas
+        orders_criadas.append(resultado_up)
+        orders_criadas.append(resultado_down)
+        
+        # FASE 1: Remover polling desnecessário - Verificação opcional
+        # Comentado para reduzir latência. Descomente se precisar verificar latência.
+        verificar_latencia = os.getenv('VERIFICAR_LATENCIA', 'false').lower() == 'true'
+        
+        if verificar_latencia:
+            print(f"\n   🔍 Medindo latência (opcional)...")
+            # Verificar quando as ordens aparecem no order book
+            for order in orders_criadas:
+                print(f"\n   🔍 Verificando {order['tipo']}...")
+                resultado_verificacao = verificar_ordem_no_orderbook(
+                    client, order['token'], order['preco'], order['lado'], 
+                    order['tamanho'], order_id=order['order_id'], timeout=10
+                )
+                order['verificacao'] = resultado_verificacao
+                
+                if resultado_verificacao['encontrada']:
+                    latencia_ms = resultado_verificacao['tempo_decorrido'] * 1000
+                    print(f"      ✅ Latência: {latencia_ms:.2f}ms ({resultado_verificacao['tempo_decorrido']:.3f}s)")
+                else:
+                    print(f"      ⚠️  Ordem não encontrada no order book dentro do timeout")
+        else:
+            print(f"\n   ⚡ Polling desabilitado (otimização Fase 1 - reduz latência)")
+            print(f"   💡 Para habilitar verificação de latência, defina VERIFICAR_LATENCIA=true no .env")
         
         # Resumo das ordens criadas com latência
         print("\n" + "=" * 80)
@@ -464,10 +461,10 @@ def teste_ordem_maker_verificacao():
                 else:
                     print(f"      ⚠️  Não encontrada no order book (timeout: {verificacao['tempo_decorrido']:.2f}s)")
         
-        # Calcular latência média
+        # Calcular latência média (se verificação foi habilitada)
         latencias = []
         for order in orders_criadas:
-            if 'verificacao' in order and order['verificacao']['encontrada']:
+            if 'verificacao' in order and order['verificacao'].get('encontrada', False):
                 latencias.append(order['verificacao']['tempo_decorrido'] * 1000)
         
         if latencias:
@@ -478,6 +475,8 @@ def teste_ordem_maker_verificacao():
             print(f"      Média: {latencia_media:.2f}ms")
             print(f"      Mínima: {latencia_min:.2f}ms")
             print(f"      Máxima: {latencia_max:.2f}ms")
+        else:
+            print(f"\n   ⚡ Latência não medida (polling desabilitado para otimização)")
         
         print(f"\n   ⏰ Criadas em: {timestamp_criacao.strftime('%Y-%m-%d %H:%M:%S')}")
         print("=" * 80)

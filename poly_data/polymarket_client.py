@@ -12,6 +12,8 @@ except ImportError:
     ExtraDataToPOAMiddleware = geth_poa_middleware
 from eth_account import Account
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 import pandas as pd
 import json
 import subprocess
@@ -98,6 +100,34 @@ class PolymarketClient:
             address=self.addresses['conditional_tokens'],
             abi=ConditionalTokenABI
         )
+        
+        # FASE 1: Connection Pooling - Criar sessão HTTP reutilizável
+        # Isso reduz latência ao reutilizar conexões TCP/TLS
+        self.session = requests.Session()
+        
+        # Configurar retry strategy para melhor confiabilidade
+        retry_strategy = Retry(
+            total=3,
+            backoff_factor=0.1,
+            status_forcelist=[429, 500, 502, 503, 504],
+            allowed_methods=["GET", "POST"]
+        )
+        
+        adapter = HTTPAdapter(
+            max_retries=retry_strategy,
+            pool_connections=10,  # Pool de conexões
+            pool_maxsize=20,      # Máximo de conexões no pool
+            pool_block=False
+        )
+        
+        self.session.mount("http://", adapter)
+        self.session.mount("https://", adapter)
+        
+        # Configurar headers padrão para keep-alive
+        self.session.headers.update({
+            'Connection': 'keep-alive',
+            'Keep-Alive': 'timeout=60, max=1000'
+        })
 
     # ... rest of the class unchanged (create_order, get_order_book, etc.) ...
 
@@ -154,14 +184,16 @@ class PolymarketClient:
         return self.usdc_contract.functions.balanceOf(self.browser_wallet).call() / 10 ** 6
 
     def get_pos_balance(self):
-        res = requests.get(f'https://data-api.polymarket.com/value?user={self.browser_wallet}')
+        # FASE 1: Usar sessão reutilizável em vez de requests.get
+        res = self.session.get(f'https://data-api.polymarket.com/value?user={self.browser_wallet}')
         return float(res.json()['value'])
 
     def get_total_balance(self):
         return self.get_usdc_balance() + self.get_pos_balance()
 
     def get_all_positions(self):
-        res = requests.get(f'https://data-api.polymarket.com/positions?user={self.browser_wallet}')
+        # FASE 1: Usar sessão reutilizável em vez de requests.get
+        res = self.session.get(f'https://data-api.polymarket.com/positions?user={self.browser_wallet}')
         return pd.DataFrame(res.json())
 
     def get_raw_position(self, tokenId):
