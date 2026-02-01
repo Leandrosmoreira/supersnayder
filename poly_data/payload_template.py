@@ -3,7 +3,7 @@ FASE 6: Payload templates para reduzir overhead de criação de dicts
 Prealloc e reuse de estruturas
 """
 from typing import Dict, Any
-from poly_data.fixed_point import FixedPointPrice, FixedPointSize
+from poly_data.fixed_point import FixedPointPrice, FixedPointSize, USE_FIXED_POINT
 
 class PayloadTemplate:
     """Template de payload pré-definido (só trocar price/size).
