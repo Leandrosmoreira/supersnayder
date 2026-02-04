@@ -118,22 +118,22 @@ AGGRESSIVE_MODE=false
      - **Maker Rewards** - Reward tracking (auto-created)
 
 8. **Update market data:**
-```bash
-# Run the data updater to fetch all available markets
-python data_updater/data_updater.py
-```
+   ```bash
+   # Run the data updater to fetch all available markets
+   python data_updater/data_updater.py
+   ```
 
 This fetches all available markets and calculates rewards/volatility metrics. Should run continuously in the background (preferably on a different IP than your trading bot).
 
 9. **Select markets to trade:**
-```bash
-# Option 1: Automated selection by profitability (default)
-python update_selected_markets.py
-
-# Option 2: High reward mode (markets with >= $100/day)
-python update_selected_markets.py --min-reward 100 --max-markets 10
-
-# Option 3: Manual selection - Add markets to "Selected Markets" sheet
+   ```bash
+   # Option 1: Automated selection by profitability (default)
+   python update_selected_markets.py
+   
+   # Option 2: High reward mode (markets with >= $100/day)
+   python update_selected_markets.py --min-reward 100 --max-markets 10
+   
+   # Option 3: Manual selection - Add markets to "Selected Markets" sheet
 ```
 
 10. **Start the market making bot:**
